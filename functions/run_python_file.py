@@ -1,5 +1,30 @@
 import os
 import subprocess
+from google import genai
+from google.genai import types
+
+schema_run_python_file = types.FunctionDeclaration(
+    name="run_python_file",
+    description="Executes specified Python file relative to the working directory",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="File path of file to be executed, relative to the working directory",
+            ),
+            "args": types.Schema(
+                type=types.Type.ARRAY,
+                description="Arguments passed to the execution of specified Python file",
+                items=types.Schema(
+                    type=types.Type.STRING
+                )
+            ),
+        },
+        required=['file_path']
+    ),
+)
+
 
 def run_python_file(working_directory, file_path, args=None):
     working_dir_abs = os.path.abspath(working_directory)
@@ -29,14 +54,15 @@ def run_python_file(working_directory, file_path, args=None):
         for arg in args:
             command.extend(arg)
 
-    completed_process = subprocess.run(command, cwd=working_dir_abs, capture_output=True, text=True, timeout=30)
+    completed_process = subprocess.run(
+        command, cwd=working_dir_abs, capture_output=True, text=True, timeout=30)
 
     output_str = ""
     if completed_process.returncode != 0:
         output_str += f"Process exited with code {completed_process.returncode}"
 
     if len(completed_process.stdout) == 0 and len(completed_process.stderr):
-        output_str += "No output produced" 
+        output_str += "No output produced"
 
     output_str += f"STDOUT: {completed_process.stdout} STDERR: {completed_process.stderr}"
     print(output_str)
