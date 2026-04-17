@@ -55,7 +55,8 @@ def run_python_file(working_directory, file_path, args=None):
             command.extend(arg)
 
     completed_process = subprocess.run(
-        command, cwd=working_dir_abs, capture_output=True, text=True, timeout=30)
+        command, cwd=working_dir_abs, capture_output=True, text=True, timeout=30
+        )
 
     output_str = ""
     if completed_process.returncode != 0:
