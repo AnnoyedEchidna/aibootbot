@@ -28,16 +28,10 @@ def write_file(working_directory, file_path, content):
     valid_target_path = os.path.commonpath(
         [working_dir_abs, target_path]) == working_dir_abs
     if not valid_target_path:
-        result = f'Error: Cannot write to "{file_path}" as it is outside the permitted working file_path'
-        print(
-            f"Result for {file_path if file_path != "." else "current"} file_path:\n  {result}")
-        return
+        return f'Error: Cannot write to "{file_path}" as it is outside the permitted working file_path'
 
     if os.path.isdir(target_path):
-        result = f'Error: Cannot write to "{file_path}" as it is a directory'
-        print(
-            f"Result for {file_path if file_path != "." else "current"} file_path:\n  {result}")
-        return
+        return f'Error: Cannot write to "{file_path}" as it is a directory'
 
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
     with open(target_path, "w") as f:
@@ -45,5 +39,4 @@ def write_file(working_directory, file_path, content):
         f.close()
 
     if os.path.isfile(target_path):
-        print(
-            f'Successfully wrote to "{file_path}" ({len(content)} characters written)')
+        return f'Successfully wrote to "{file_path}" ({len(content)} characters written)'

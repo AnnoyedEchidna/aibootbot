@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 from prompts import system_prompt
 from dotenv import load_dotenv
@@ -24,34 +25,65 @@ def main():
         role="user", parts=[types.Part(text=args.user_prompt)])]
 
     client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model='gemini-2.5-flash', contents=messages,
-        config=types.GenerateContentConfig(tools=[available_functions], system_instruction=system_prompt))
-    if response.usage_metadata is None:
-        raise RuntimeError(
-            "Response metadata unavailable; possible request failure")
-    if args.verbose:
-        print(f"User prompt:{args.user_prompt}")
-        print(f"Prompt tokens:{response.usage_metadata.prompt_token_count}")
-        print(
-            f"Response tokens:{response.usage_metadata.candidates_token_count}")
 
-    if response.function_calls is not None:
-        result_list = []
-        for function_call in response.function_calls:
-            function_call_result = call_function(function_call, args.verbose)
-            if len(function_call_result.parts) == 0:
-                raise Exception("No results from function call?")
-            if function_call_result.parts[0].function_response is None:
-                raise Exception("Nothing in results.parts[0]")
-            if function_call_result.parts[0].function_response.response is None:
-                raise Exception("Nothing in results.parts[0].response")
-            result_list.append(function_call_result.parts[0])
-            if args.verbose:
-                print(
-                    f"-> {function_call_result.parts[0].function_response.response}")
-    else:
-        print(f"Response:{response.text}")
+    # Create feedback loop for AI to work with its own output. Limit to range(20)
+    i = 0
+    for _ in range(20):
+        print(f"top of loop: iteration {i}")
+        i += 1
+        response = client.models.generate_content(
+            model='gemini-2.5-flash', contents=messages,
+            config=types.GenerateContentConfig
+            (
+                tools=[available_functions],
+                system_instruction=system_prompt
+            )
+        )
+        # Check if response has candidates (a list of responses and previous responses?) and append any to messages
+        if response.candidates is not None:
+            for candidate in response.candidates:
+                messages.append(candidate.content)
+
+        # Check AI call usage metadata; if None, raise runtime error
+        if response.usage_metadata is None:
+            raise RuntimeError(
+                "Response metadata unavailable; possible request failure")
+        # If --verbose passed at user cli call, also include useage_metadata
+        if args.verbose:
+            print(f"User prompt:{args.user_prompt}")
+            print(
+                f"Prompt tokens:{response.usage_metadata.prompt_token_count}")
+            print(
+                f"Response tokens:{response.usage_metadata.candidates_token_count}")
+
+        # Capture and check function_call response. If None, print response as it is not a function-based response and should be text-only
+        if response.function_calls is not None:
+            result_list = []
+            for function_call in response.function_calls:
+                function_call_result = call_function(
+                    function_call, args.verbose)
+                if len(function_call_result.parts) == 0:
+                    raise Exception("No results from function call?")
+                if function_call_result.parts[0].function_response is None:
+                    raise Exception("Nothing in results.parts[0]")
+                if function_call_result.parts[0].function_response.response is None:
+                    raise Exception("Nothing in results.parts[0].response")
+
+                # Append result of function calls to results
+                result_list.append(function_call_result.parts[0])
+                if args.verbose:
+                    print(
+                        f"-> {function_call_result.parts[0].function_response.response}")
+            # Append result of function call to messages to pass back into next loop of AI call.
+            messages.append(types.Content(
+                role="user",
+                parts=result_list)
+            )
+        else:
+            print(f"Response:{response.text}")
+            return
+        # If at the end of the main for loop without a final response from bot, exit with exitcode 1
+    sys.exit(1)
 
 
 if __name__ == "__main__":
